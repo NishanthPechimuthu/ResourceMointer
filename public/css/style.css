@@ -1,16 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --accent-primary: #3b82f6;
-    --accent-secondary: #8b5cf6;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --border-color: rgba(255, 255, 255, 0.1);
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.05);
-    --error-color: #ef4444;
+    /* Main Palette */
+    --bg-primary: #111827;
+    --bg-secondary: #1F2937;
+    --bg-elevated: #273549;
+    --accent-primary: #6366F1;
+    --accent-secondary: #06B6D4;
+    --text-primary: #F9FAFB;
+    --text-secondary: #9CA3AF;
+    --border-color: #374151;
+    --disabled-color: #6B7280;
+    
+    /* Status Colors */
+    --error-color: #EF4444;
+    --success-color: #22C55E;
+    --warning-color: #F59E0B;
 }
 
 * {
@@ -30,37 +35,27 @@ body {
     position: relative;
 }
 
-/* Background Gradients */
-body::before {
-    content: '';
-    position: absolute;
-    top: -20%;
-    left: -10%;
-    width: 50vw;
-    height: 50vw;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(15, 23, 42, 0) 70%);
-    z-index: -1;
+/* Material Icons utility */
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24;
+  vertical-align: middle;
+  margin-right: 0.5rem;
 }
 
-body::after {
-    content: '';
-    position: absolute;
-    bottom: -20%;
-    right: -10%;
-    width: 50vw;
-    height: 50vw;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(15, 23, 42, 0) 70%);
-    z-index: -1;
-}
-
-/* Glassmorphism Utilities */
+/* Claymorphism Utilities */
 .glass-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    background: var(--bg-secondary);
+    border-radius: 24px;
+    box-shadow: 
+        10px 10px 30px rgba(0, 0, 0, 0.4), 
+        inset 2px 2px 5px rgba(255, 255, 255, 0.15), 
+        inset -3px -3px 8px rgba(0, 0, 0, 0.3);
+    border: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Inputs and Buttons */
@@ -97,19 +92,21 @@ body::after {
 .btn-primary {
     width: 100%;
     padding: 0.75rem 1rem;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    background: var(--accent-primary);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    background: #4F46E5; /* Indigo 600 */
+    box-shadow: 0 6px 15px rgba(99, 102, 241, 0.5);
 }
 
 .btn-primary:active {

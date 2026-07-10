@@ -1,0 +1,43 @@
+<div class="min-h-screen flex-center">
+    <div class="glass-panel" style="width: 100%; max-width: 420px; padding: 2.5rem; text-align: center;">
+        
+        <div style="margin-bottom: 2rem;">
+            <h1 style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; background: linear-gradient(135deg, var(--text-primary), var(--accent-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NP Dashboard</h1>
+            <p style="color: var(--text-secondary); font-size: 0.95rem;">Authenticate to manage your servers</p>
+        </div>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--error-color); color: var(--error-color); padding: 0.75rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+                <%= error %>
+            </div>
+        <% } %>
+
+        <form action="/auth/login" method="POST" style="text-align: left;">
+            <div class="input-group">
+                <label for="username" class="input-label">Email Address</label>
+                <input type="email" id="username" name="username" class="input-field" placeholder="admin@example.com" required autocomplete="username">
+            </div>
+
+            <div class="input-group">
+                <label for="password" class="input-label">Password</label>
+                <input type="password" id="password" name="password" class="input-field" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+
+            <!-- TOTP Field for Future Use (Hidden for now until implemented) -->
+            <!-- 
+            <div class="input-group">
+                <label for="totp" class="input-label">Authenticator Code</label>
+                <input type="text" id="totp" name="totp" class="input-field" placeholder="123456" autocomplete="one-time-code">
+            </div> 
+            -->
+
+            <button type="submit" class="btn-primary" style="margin-top: 1rem;">
+                Secure Login
+            </button>
+        </form>
+
+        <div style="margin-top: 2rem; font-size: 0.85rem; color: var(--text-secondary);">
+            <p>Protected by NP Security</p>
+        </div>
+    </div>
+</div>

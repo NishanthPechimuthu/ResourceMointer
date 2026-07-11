@@ -51,6 +51,61 @@ async function setupDatabase() {
             console.log(`Admin user '${adminEmail}' already exists. Skipping creation.`);
         }
 
+        console.log('Creating "attackers" table...');
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS attackers (
+                ip VARCHAR(45) PRIMARY KEY,
+                total_score INTEGER DEFAULT 0,
+                offense_count INTEGER DEFAULT 0,
+                first_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        console.log('Creating "requests" table...');
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS requests (
+                id SERIAL PRIMARY KEY,
+                ip VARCHAR(45) NOT NULL,
+                method VARCHAR(10),
+                url TEXT,
+                user_agent TEXT,
+                payload TEXT,
+                score INTEGER DEFAULT 0,
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        console.log('Creating "bans" table...');
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bans (
+                id SERIAL PRIMARY KEY,
+                ip VARCHAR(45) NOT NULL,
+                reason TEXT,
+                ban_type VARCHAR(50),
+                expires_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        console.log('Creating "whitelist" table...');
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS whitelist (
+                ip VARCHAR(45) PRIMARY KEY,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        console.log('Creating "blacklist" table...');
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS blacklist (
+                ip VARCHAR(45) PRIMARY KEY,
+                reason TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('Database setup complete.');
 
     } catch (err) {

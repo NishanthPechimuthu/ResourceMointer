@@ -68,6 +68,9 @@ app.use('/auth', authRoutes);
 const dashboardRoutes = require('./routes/dashboard');
 app.use('/dashboard', dashboardRoutes);
 
+const securityApiRoutes = require('./routes/securityApi');
+app.use('/api/security', securityApiRoutes);
+
 // Root Route Redirects to Dashboard or Login
 app.get('/', (req, res) => {
     if (req.isAuthenticated()) {

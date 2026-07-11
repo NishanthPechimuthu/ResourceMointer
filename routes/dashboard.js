@@ -11,6 +11,11 @@ function isAuthenticated(req, res, next) {
 router.use(isAuthenticated);
 
 router.get('/', dashboardController.renderDashboard);
+
+router.get('/security', (req, res) => {
+    res.render('dashboard/security', { user: req.user, title: 'Security Analytics' });
+});
+
 router.get('/api/system/metrics', dashboardController.getMetricsAPI);
 router.get('/api/docker/metrics', dashboardController.getDockerAPI);
 router.get('/api/db/metrics', dashboardController.getDbAPI);

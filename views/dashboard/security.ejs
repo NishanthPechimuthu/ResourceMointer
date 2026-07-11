@@ -1,0 +1,96 @@
+<div class="dashboard-wrapper container">
+    <header class="dashboard-header glass-panel flex-center" style="justify-content: space-between; padding: 1.5rem 2rem; margin-top: 2rem; margin-bottom: 2rem;">
+        <div>
+            <h1 style="font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, var(--text-primary), var(--accent-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                <span class="material-symbols-outlined" style="font-size: 2rem; vertical-align: bottom; margin-right: 0.25rem;">security</span>
+                Security Analytics
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.25rem;">Monitor and manage NP Security Engine bans</p>
+        </div>
+        <div>
+            <a href="/dashboard" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; padding: 0.5rem 1.5rem; font-size: 0.9rem;">
+                <span class="material-symbols-outlined" style="font-size: 1.2rem;">arrow_back</span>
+                Dashboard
+            </a>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <!-- Active Bans Table -->
+        <div class="stat-card glass-panel" style="grid-column: span 2;">
+            <h3 class="card-title">
+                <span class="material-symbols-outlined" style="color: var(--error-color);">gavel</span>
+                Active System Bans
+            </h3>
+            <div style="overflow-x: auto;">
+                <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">IP Address</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Reason</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Ban Type</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Expires</th>
+                            <th style="text-align: right; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bans-table-body">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading bans...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Whitelist / Blacklist Manager -->
+        <div class="stat-card glass-panel" style="display: flex; flex-direction: column;">
+            <h3 class="card-title">
+                <span class="material-symbols-outlined" style="color: var(--accent-primary);">tune</span>
+                Manual Overrides
+            </h3>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Block IP (Blacklist)</h4>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="block-ip" class="input-field" placeholder="1.2.3.4" style="flex-grow: 1; padding: 0.5rem;">
+                    <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: var(--error-color);" onclick="blockIp()">Block</button>
+                </div>
+            </div>
+
+            <div>
+                <h4 style="margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Whitelist IP</h4>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="whitelist-ip" class="input-field" placeholder="1.2.3.4" style="flex-grow: 1; padding: 0.5rem;">
+                    <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem; background: var(--success-color);" onclick="whitelistIp()">Allow</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Attacks -->
+        <div class="stat-card glass-panel" style="grid-column: span 2;">
+            <h3 class="card-title">
+                <span class="material-symbols-outlined" style="color: var(--warning-color);">radar</span>
+                Recent Malicious Requests
+            </h3>
+            <div style="overflow-x: auto; max-height: 400px;">
+                <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Time</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">IP Address</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Request URL</th>
+                            <th style="text-align: left; padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attacks-table-body">
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading attack data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/security.js"></script>

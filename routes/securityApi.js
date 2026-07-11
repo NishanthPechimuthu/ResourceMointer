@@ -2,10 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/db');
 const securityEngine = require('../engine/securityEngine');
-const { ensureAuthenticated } = require('../middleware/auth');
+
+// Middleware to protect API routes
+function isAuthenticated(req, res, next) {
+    if (req.isAuthenticated()) return next();
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+}
 
 // Apply auth middleware to all security routes
-router.use(ensureAuthenticated);
+router.use(isAuthenticated);
 
 // GET /api/security/attackers
 router.get('/attackers', async (req, res) => {

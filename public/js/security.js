@@ -1,5 +1,6 @@
 // =============================================================================
 // NP Security Dashboard — Frontend Controller
+// CSP-compliant: zero inline onclick= handlers, all via event delegation
 // =============================================================================
 
 // ---------------------------------------------------------------------------
@@ -88,8 +89,16 @@ function formatRelative(dateStr) {
     return new Date(dateStr).toLocaleDateString();
 }
 
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 // ---------------------------------------------------------------------------
-// Table renderers
+// Table renderers — all buttons use data-* attributes, NO onclick=
 // ---------------------------------------------------------------------------
 function updateAttackersTable(attackers) {
     const tbody = document.getElementById('attackers-table-body');
@@ -101,21 +110,24 @@ function updateAttackersTable(attackers) {
     const maxScore = Math.max(...attackers.map(a => a.total_score), 1);
 
     tbody.innerHTML = attackers.map(a => {
-        const barWidth   = Math.min(100, Math.round((a.total_score / maxScore) * 100));
-        const color1h    = scoreColor(a.recent_score_1h);
+        const safeIp    = escapeHtml(a.ip);
+        const barWidth  = Math.min(100, Math.round((a.total_score / maxScore) * 100));
+        const color1h   = scoreColor(a.recent_score_1h);
+
         const statusBadge = a.is_banned
             ? `<span style="background:var(--error-color);color:#fff;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">BANNED</span>`
             : a.recent_score_1h >= 40
             ? `<span style="background:#f97316;color:#fff;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">⚠ NEAR LIMIT</span>`
             : `<span style="background:rgba(34,197,94,0.2);color:#22c55e;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">ACTIVE</span>`;
 
+        // Use data-action + data-ip — NO onclick=
         const banBtn = a.is_banned
-            ? `<button class="btn-primary" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border-color);" onclick="unblockIp('${a.ip}')">Unblock</button>`
-            : `<button class="btn-primary" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--error-color);" onclick="banNow('${a.ip}')">Ban Now</button>`;
+            ? `<button class="btn-primary sec-action" data-action="unblock" data-ip="${safeIp}" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border-color);">Unblock</button>`
+            : `<button class="btn-primary sec-action" data-action="ban-now" data-ip="${safeIp}" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--error-color);">Ban Now</button>`;
 
         return `
             <tr>
-                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);font-family:monospace;font-size:0.9rem;">${a.ip}</td>
+                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);font-family:monospace;font-size:0.9rem;">${safeIp}</td>
                 <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);">
                     <span style="color:${scoreColor(a.total_score)};font-weight:700;">${a.total_score}</span>
                     <div class="threat-bar"><div class="threat-bar-fill" style="width:${barWidth}%;background:${threatBarColor(a.total_score)};"></div></div>
@@ -138,18 +150,19 @@ function updateBansTable(bans) {
     }
 
     tbody.innerHTML = bans.map(ban => {
-        const expires     = ban.expires_at ? new Date(ban.expires_at).toLocaleString() : 'Permanent';
-        const badgeColor  = ban.ban_type === 'permanent' ? 'var(--error-color)' : 'var(--warning-color)';
+        const safeIp     = escapeHtml(ban.ip);
+        const expires    = ban.expires_at ? new Date(ban.expires_at).toLocaleString() : 'Permanent';
+        const badgeColor = ban.ban_type === 'permanent' ? 'var(--error-color)' : 'var(--warning-color)';
         return `
             <tr>
-                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);font-family:monospace;">${ban.ip}</td>
-                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);max-width:300px;word-break:break-word;">${ban.reason || '—'}</td>
+                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);font-family:monospace;">${safeIp}</td>
+                <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);max-width:300px;word-break:break-word;">${escapeHtml(ban.reason || '—')}</td>
                 <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);">
-                    <span style="background:${badgeColor};color:#fff;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.78rem;font-weight:600;text-transform:uppercase;">${ban.ban_type}</span>
+                    <span style="background:${badgeColor};color:#fff;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.78rem;font-weight:600;text-transform:uppercase;">${escapeHtml(ban.ban_type)}</span>
                 </td>
                 <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);font-size:0.85rem;">${expires}</td>
                 <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);text-align:right;">
-                    <button class="btn-primary" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border-color);" onclick="unblockIp('${ban.ip}')">Unblock</button>
+                    <button class="btn-primary sec-action" data-action="unblock" data-ip="${safeIp}" style="padding:0.3rem 0.7rem;font-size:0.8rem;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border-color);">Unblock</button>
                 </td>
             </tr>
         `;
@@ -166,9 +179,9 @@ function updateAttacksTable(attacks) {
     tbody.innerHTML = attacks.map(attack => `
         <tr>
             <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);white-space:nowrap;font-size:0.85rem;">${new Date(attack.timestamp).toLocaleTimeString()}</td>
-            <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--error-color);font-family:monospace;">${attack.ip}</td>
+            <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--error-color);font-family:monospace;">${escapeHtml(attack.ip)}</td>
             <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);word-break:break-all;font-size:0.85rem;">
-                <span style="color:var(--accent-secondary);font-weight:600;margin-right:0.4rem;">${attack.method}</span>${attack.url}
+                <span style="color:var(--accent-secondary);font-weight:600;margin-right:0.4rem;">${escapeHtml(attack.method)}</span>${escapeHtml(attack.url)}
             </td>
             <td style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);font-weight:700;color:${scoreColor(attack.score)};">+${attack.score}</td>
         </tr>
@@ -180,11 +193,13 @@ function updateAttacksTable(attacks) {
 // ---------------------------------------------------------------------------
 function showStatus(msg, isError = false) {
     const el = document.getElementById('override-status');
+    if (!el) return;
     el.style.display      = 'block';
     el.style.background   = isError ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)';
     el.style.color        = isError ? '#ef4444' : '#22c55e';
     el.style.border       = `1px solid ${isError ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`;
     el.style.borderRadius = '8px';
+    el.style.padding      = '0.75rem';
     el.textContent        = msg;
     setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
@@ -192,7 +207,7 @@ function showStatus(msg, isError = false) {
 async function blockIp() {
     const ip     = document.getElementById('block-ip').value.trim();
     const reason = document.getElementById('block-reason').value.trim();
-    if (!ip) return;
+    if (!ip) { showStatus('❌ Please enter an IP address.', true); return; }
 
     const btn = document.getElementById('btn-block-ip');
     btn.disabled    = true;
@@ -222,7 +237,7 @@ async function blockIp() {
 }
 
 async function banNow(ip) {
-    if (!confirm(`Force-ban ${ip} permanently? This will also update nginx immediately.`)) return;
+    if (!confirm(`Force-ban ${ip} permanently? Nginx will be updated immediately.`)) return;
 
     try {
         const res  = await fetch('/api/security/ban-now', {
@@ -243,7 +258,7 @@ async function banNow(ip) {
 }
 
 async function unblockIp(ip) {
-    if (!confirm(`Unblock ${ip}? Their attack score will be reset.`)) return;
+    if (!confirm(`Unblock ${ip}? Their attack score will be reset to zero.`)) return;
 
     try {
         const res  = await fetch('/api/security/unblock', {
@@ -265,7 +280,7 @@ async function unblockIp(ip) {
 
 async function whitelistIp() {
     const ip  = document.getElementById('whitelist-ip').value.trim();
-    if (!ip) return;
+    if (!ip) { showStatus('❌ Please enter an IP address.', true); return; }
 
     const btn = document.getElementById('btn-whitelist-ip');
     btn.disabled    = true;
@@ -294,7 +309,39 @@ async function whitelistIp() {
 }
 
 // ---------------------------------------------------------------------------
+// Event delegation — handles ALL dynamic table buttons (no onclick= needed)
+// A single listener on document catches clicks on any .sec-action button,
+// reads data-action and data-ip, then dispatches the correct function.
+// ---------------------------------------------------------------------------
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.sec-action');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const ip     = btn.dataset.ip;
+    if (!ip) return;
+
+    if (action === 'unblock')  unblockIp(ip);
+    if (action === 'ban-now')  banNow(ip);
+});
+
+// Static button bindings (replaces onclick= on EJS buttons)
+document.addEventListener('DOMContentLoaded', function () {
+    const blockBtn     = document.getElementById('btn-block-ip');
+    const whitelistBtn = document.getElementById('btn-whitelist-ip');
+
+    if (blockBtn)     blockBtn.addEventListener('click', blockIp);
+    if (whitelistBtn) whitelistBtn.addEventListener('click', whitelistIp);
+
+    // Also allow pressing Enter in the IP input fields
+    const blockIpInput = document.getElementById('block-ip');
+    const wlIpInput    = document.getElementById('whitelist-ip');
+    if (blockIpInput) blockIpInput.addEventListener('keydown', e => { if (e.key === 'Enter') blockIp(); });
+    if (wlIpInput)    wlIpInput.addEventListener('keydown',    e => { if (e.key === 'Enter') whitelistIp(); });
+});
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 fetchSecurityData();
-setInterval(fetchSecurityData, 15000); // refresh every 15 seconds
+setInterval(fetchSecurityData, 15000);

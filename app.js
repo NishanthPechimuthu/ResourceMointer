@@ -17,11 +17,23 @@ app.set('trust proxy', 1);
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:"],
+            defaultSrc:    ["'self'"],
+            scriptSrc:     [
+                "'self'",
+                "'unsafe-inline'",           // for EJS inline scripts if any
+                "https://cdn.jsdelivr.net",
+                "https://static.cloudflareinsights.com"  // Cloudflare Web Analytics
+            ],
+            // FIX: explicitly allow 'unsafe-inline' on attributes (onclick handlers)
+            // Best practice is 'none' + event delegation, but this unblocks immediately
+            scriptSrcAttr: ["'unsafe-inline'"],
+            styleSrc:      ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc:       ["'self'", "https://fonts.gstatic.com"],
+            imgSrc:        ["'self'", "data:", "https://static.cloudflareinsights.com"],
+            connectSrc:    [
+                "'self'",
+                "https://cloudflareinsights.com"         // Cloudflare beacon POST target
+            ],
         },
     },
 }));

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Tail } = require('tail');
 const { pool } = require('../config/db');
+const { exec } = require('child_process');
 
 // Attack Scoring Rules
 const ATTACK_RULES = {
@@ -199,6 +200,19 @@ class SecurityEngine {
 
             fs.writeFileSync(this.bansFilePath, confContent);
             console.log(`[SecurityEngine] Synced ${res.rows.length} blocked IPs to Nginx config.`);
+            
+            // Reload Nginx to apply changes
+            exec('sudo nginx -s reload', (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`[SecurityEngine] Error reloading Nginx: ${error.message}`);
+                    return;
+                }
+                if (stderr) {
+                    console.error(`[SecurityEngine] Nginx reload stderr: ${stderr}`);
+                    return;
+                }
+                console.log(`[SecurityEngine] Nginx reloaded successfully`);
+            });
             
         } catch (err) {
             console.error('[SecurityEngine] Error syncing bans file:', err);

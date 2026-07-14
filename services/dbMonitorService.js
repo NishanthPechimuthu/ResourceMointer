@@ -33,31 +33,48 @@ class DbMonitorService {
         }
     }
 
-    // Returns full connection list from pg_stat_activity
+    // Returns connection list from pg_stat_activity.
+    // Works for non-superuser accounts — they see all rows in PG 10+ by default,
+    // but some columns (query, client_addr) may be NULL if no pg_monitor role.
+    // Falls back to a minimal safe query if the full one errors.
     static async getConnections() {
         try {
+            // Try full query first (needs pg_monitor or superuser for query text on other users)
             const res = await db.query(`
                 SELECT
                     pid,
-                    usename                                                           AS username,
-                    application_name,
-                    client_addr::text                                                 AS client_addr,
-                    datname                                                           AS database,
-                    state,
-                    ROUND(EXTRACT(epoch FROM (NOW() - state_change))::numeric, 1)    AS state_seconds,
-                    ROUND(EXTRACT(epoch FROM (NOW() - query_start))::numeric,  1)    AS query_seconds,
-                    LEFT(query, 120)                                                  AS query_snippet,
-                    wait_event_type,
-                    wait_event,
-                    (pid = pg_backend_pid())                                          AS is_self
+                    COALESCE(usename, '')                                              AS username,
+                    COALESCE(application_name, '')                                     AS application_name,
+                    COALESCE(client_addr::text, 'local')                               AS client_addr,
+                    COALESCE(datname, '')                                              AS database,
+                    COALESCE(state, 'unknown')                                         AS state,
+                    COALESCE(
+                        ROUND(EXTRACT(epoch FROM (NOW() - state_change))::numeric, 1),
+                        0
+                    )                                                                  AS state_seconds,
+                    COALESCE(
+                        ROUND(EXTRACT(epoch FROM (NOW() - query_start))::numeric, 1),
+                        0
+                    )                                                                  AS query_seconds,
+                    COALESCE(LEFT(query, 120), '')                                     AS query_snippet,
+                    COALESCE(wait_event_type, '')                                      AS wait_event_type,
+                    COALESCE(wait_event, '')                                           AS wait_event,
+                    (pid = pg_backend_pid())                                           AS is_self
                 FROM pg_stat_activity
                 WHERE datname IS NOT NULL
-                ORDER BY state, state_change ASC
+                ORDER BY
+                    CASE state
+                        WHEN 'active' THEN 1
+                        WHEN 'idle in transaction' THEN 2
+                        ELSE 3
+                    END,
+                    state_change ASC
             `);
             return res.rows;
         } catch (err) {
-            console.error('Error fetching DB connections:', err);
-            return null;
+            console.error('[DbMonitor] getConnections error:', err.message);
+            // Return a structured error so the route can surface it to the UI
+            return { _error: err.message };
         }
     }
 

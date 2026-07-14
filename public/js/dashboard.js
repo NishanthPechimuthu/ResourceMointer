@@ -109,14 +109,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const fetchDbConnections = async () => {
-        const tbody   = document.getElementById('db-conn-tbody');
-        const badge   = document.getElementById('db-conn-count-badge');
+        const tbody = document.getElementById('db-conn-tbody');
+        const badge = document.getElementById('db-conn-count-badge');
         if (!tbody) return;
 
+        const showError = (msg) => {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--error-color);font-size:0.85rem;">⚠️ ${msg}</td></tr>`;
+        };
+
+        // 8-second timeout so it never hangs forever on a stale server
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), 8000);
+
         try {
-            const res  = await fetch('/dashboard/api/db/connections');
+            const res = await fetch('/dashboard/api/db/connections', { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            // If server returned non-JSON (e.g. HTML 404 page from old server), show HTTP status
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                showError(`HTTP ${res.status} — ${text.substring(0, 80) || 'Server error. Did you restart the server?'}`);
+                return;
+            }
+
             const data = await res.json();
-            if (!data.success) throw new Error(data.error);
+            if (!data.success) {
+                showError(`DB Error: ${data.error}`);
+                return;
+            }
 
             const conns = data.data;
             if (badge) badge.textContent = `${conns.length} connection${conns.length !== 1 ? 's' : ''}`;
@@ -127,16 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             tbody.innerHTML = conns.map(c => {
-                const pid      = c.pid;
-                const app      = c.application_name || '—';
-                const user     = c.username         || '—';
-                const db       = c.database         || '—';
-                const state    = c.state            || 'unknown';
-                const dur      = c.state_seconds != null ? `${c.state_seconds}s` : '—';
-                const query    = c.query_snippet    ? c.query_snippet.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '<span style="color:var(--text-secondary);font-style:italic;">idle</span>';
+                const pid   = c.pid;
+                const app   = c.application_name || '—';
+                const user  = c.username         || '—';
+                const db    = c.database         || '—';
+                const state = c.state            || 'unknown';
+                const dur   = c.state_seconds != null ? `${c.state_seconds}s` : '—';
+                const query = c.query_snippet
+                    ? c.query_snippet.replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    : '<span style="color:var(--text-secondary);font-style:italic;">idle</span>';
 
-                const stateColor = state === 'active'           ? '#22c55e'
-                                 : state === 'idle'             ? 'var(--text-secondary)'
+                const stateColor = state === 'active'              ? '#22c55e'
+                                 : state === 'idle'                ? 'var(--text-secondary)'
                                  : state === 'idle in transaction' ? '#f97316'
                                  : '#eab308';
                 const stateBadge = `<span style="background:${stateColor}22;color:${stateColor};padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">${state}</span>`;
@@ -157,9 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);text-align:right;">${terminateBtn}</td>
                     </tr>`;
             }).join('');
+
         } catch (err) {
-            console.error('Error fetching DB connections:', err);
-            if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--error-color);">Error loading connections.</td></tr>';
+            clearTimeout(timeoutId);
+            const msg = err.name === 'AbortError'
+                ? 'Request timed out (8s). Server may not be running or restarted.'
+                : err.message;
+            console.error('[fetchDbConnections]', msg);
+            showError(msg);
         }
     };
 

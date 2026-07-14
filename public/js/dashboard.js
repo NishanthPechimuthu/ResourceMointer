@@ -212,15 +212,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchSpammingIps = async () => {
         const tbody = document.getElementById('spam-ips-body');
         if (!tbody) return;
-        try {
-            const res  = await fetch('/api/security/attackers');
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
 
-            const attackers = data.data.slice(0, 10); // show top 10
+        const showError = (msg) => {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--error-color);font-size:0.85rem;">⚠️ ${msg}</td></tr>`;
+        };
+
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), 8000);
+
+        try {
+            const res = await fetch('/api/security/attackers', { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                showError(`HTTP ${res.status} — ${text.substring(0, 100) || 'Server error. Restart the server.'}`);
+                return;
+            }
+
+            const data = await res.json();
+            if (!data.success) {
+                showError(`API Error: ${data.error}`);
+                return;
+            }
+
+            const attackers = data.data.slice(0, 10);
 
             if (attackers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">No attackers detected.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">No attackers detected yet.</td></tr>';
                 return;
             }
 
@@ -249,9 +268,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);text-align:right;">${actionBtn}</td>
                     </tr>`;
             }).join('');
+
         } catch (err) {
-            console.error('Error fetching attackers:', err);
-            if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--error-color);">Error loading data.</td></tr>';
+            clearTimeout(timeoutId);
+            const msg = err.name === 'AbortError'
+                ? 'Request timed out (8s) — is the server running?'
+                : err.message;
+            console.error('[fetchSpammingIps]', msg);
+            showError(msg);
         }
     };
 
@@ -271,7 +295,6 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchMetrics();
     fetchDockerMetrics();
     fetchDbMetrics();
-    fetchDbConnections();
     fetchSecurityMetrics();
     fetchSpammingIps();
 
@@ -282,60 +305,14 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchDbMetrics();
     }, 5000);
 
-    // Poll security + DB connections every 15 seconds
+    // Poll security every 15 seconds
     setInterval(() => {
         fetchSecurityMetrics();
         fetchSpammingIps();
-        fetchDbConnections();
     }, 15000);
 
-    // Event delegation — DB connection Terminate buttons (CSP-safe, no onclick=)
+    // Event delegation — Spam IPs Block / Unblock (CSP-safe, no onclick=)
     document.addEventListener('click', async (e) => {
-
-        // ── Terminate DB connection ──────────────────────────────────────────
-        const terminateBtn = e.target.closest('.db-conn-terminate');
-        if (terminateBtn) {
-            const pid = terminateBtn.dataset.pid;
-            if (!pid || !confirm(`Terminate DB connection PID ${pid}?`)) return;
-
-            terminateBtn.disabled    = true;
-            terminateBtn.textContent = 'Terminating...';
-
-            const statusEl = document.getElementById('db-conn-status');
-            try {
-                const res  = await fetch(`/dashboard/api/db/connections/${pid}/terminate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    if (statusEl) {
-                        statusEl.style.display = 'inline';
-                        statusEl.textContent   = `✅ PID ${pid} terminated`;
-                        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-                    }
-                    fetchDbConnections();
-                    fetchDbMetrics();
-                } else {
-                    alert('Error: ' + data.error);
-                    terminateBtn.disabled    = false;
-                    terminateBtn.textContent = 'Terminate';
-                }
-            } catch (err) {
-                alert('Network error: ' + err.message);
-                terminateBtn.disabled    = false;
-                terminateBtn.textContent = 'Terminate';
-            }
-            return;
-        }
-
-        // ── Refresh DB connections button ────────────────────────────────────
-        if (e.target.closest('#btn-refresh-conns')) {
-            fetchDbConnections();
-            return;
-        }
-
-        // ── Spam IPs Block / Unblock ─────────────────────────────────────────
         const spamBtn = e.target.closest('.dash-spam-action');
         if (!spamBtn) return;
 

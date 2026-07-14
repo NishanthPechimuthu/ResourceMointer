@@ -121,43 +121,6 @@
             </div>
         </div>
 
-        <!-- DB Connection Manager (full width) -->
-        <div class="stat-card glass-panel" style="grid-column: 1 / -1;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                <h3 class="card-title" style="margin: 0;">
-                    <span class="material-symbols-outlined" style="color: var(--accent-primary);">manage_accounts</span>
-                    DB Connection Manager
-                    <span id="db-conn-count-badge" style="margin-left: 0.5rem; font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); background: var(--bg-elevated); padding: 0.2rem 0.6rem; border-radius: 99px; border: 1px solid var(--border-color);">— connections</span>
-                </h3>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <span id="db-conn-status" style="font-size: 0.82rem; color: var(--success-color); display: none;"></span>
-                    <button id="btn-refresh-conns" class="btn-primary" style="padding: 0.35rem 1rem; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 0.3rem;">
-                        <span class="material-symbols-outlined" style="font-size: 1rem;">refresh</span>
-                        Refresh
-                    </button>
-                </div>
-            </div>
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.83rem;">
-                    <thead>
-                        <tr>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500; white-space: nowrap;">PID</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Application</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">User</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Database</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">State</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Duration</th>
-                            <th style="text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Query</th>
-                            <th style="text-align: right; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 500;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="db-conn-tbody">
-                        <tr><td colspan="8" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">Loading connections...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
         <!-- Security & Nginx Card + Spamming IPs (full width) -->
         <div class="stat-card glass-panel" style="grid-column: 1 / -1;">
             <div style="display: grid; grid-template-columns: auto 1fr; gap: 2rem; align-items: start;">

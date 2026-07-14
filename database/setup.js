@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 async function setupDatabase() {
     console.log('Connecting to database...');
     const client = await pool.connect();
-    
+
     try {
         console.log('Creating "session" table (for connect-pg-simple)...');
         await client.query(`
@@ -16,7 +16,6 @@ async function setupDatabase() {
             )
             WITH (OIDS=FALSE);
         `);
-        // We also need an index on expire for performance of deleting expired sessions
         await client.query(`
             CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
         `);
@@ -41,7 +40,6 @@ async function setupDatabase() {
             const saltRounds = 10;
             const plainPassword = 'NanoTechno28@';
             const hash = await bcrypt.hash(plainPassword, saltRounds);
-
             await client.query(
                 'INSERT INTO users (username, password_hash) VALUES ($1, $2)',
                 [adminEmail, hash]
@@ -61,6 +59,8 @@ async function setupDatabase() {
                 last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_attackers_total_score ON attackers (total_score DESC);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_attackers_last_seen   ON attackers (last_seen DESC);`);
 
         console.log('Creating "requests" table...');
         await client.query(`
@@ -75,6 +75,9 @@ async function setupDatabase() {
                 timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        // Performance indexes for ban-policy evaluation queries
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_requests_ip_timestamp ON requests (ip, timestamp DESC);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_requests_timestamp    ON requests (timestamp DESC);`);
 
         console.log('Creating "bans" table...');
         await client.query(`
@@ -87,6 +90,21 @@ async function setupDatabase() {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        // FIX: Add unique constraint on ip so ON CONFLICT works and duplicates are prevented
+        await client.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'bans_ip_unique' AND conrelid = 'bans'::regclass
+                ) THEN
+                    ALTER TABLE bans ADD CONSTRAINT bans_ip_unique UNIQUE (ip);
+                END IF;
+            END
+            $$;
+        `);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bans_ip          ON bans (ip);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bans_expires_at  ON bans (expires_at);`);
 
         console.log('Creating "whitelist" table...');
         await client.query(`
@@ -106,13 +124,13 @@ async function setupDatabase() {
             );
         `);
 
-        console.log('Database setup complete.');
+        console.log('✅ Database setup complete.');
 
     } catch (err) {
         console.error('Error during database setup:', err);
     } finally {
         client.release();
-        pool.end(); // close pool completely since this is a one-off script
+        pool.end();
     }
 }
 

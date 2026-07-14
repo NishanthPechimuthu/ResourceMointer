@@ -99,13 +99,67 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/dashboard/api/db/metrics');
             if (!response.ok) throw new Error('Network error');
             const dbData = await response.json();
-            
-            setText('db-version', dbData.version);
-            setText('db-size', dbData.size);
+            setText('db-version',     dbData.version);
+            setText('db-size',        dbData.size);
             setText('db-connections', dbData.connections);
         } catch (error) {
             console.error('Error fetching DB metrics:', error);
             setText('db-version', 'Error');
+        }
+    };
+
+    const fetchDbConnections = async () => {
+        const tbody   = document.getElementById('db-conn-tbody');
+        const badge   = document.getElementById('db-conn-count-badge');
+        if (!tbody) return;
+
+        try {
+            const res  = await fetch('/dashboard/api/db/connections');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            const conns = data.data;
+            if (badge) badge.textContent = `${conns.length} connection${conns.length !== 1 ? 's' : ''}`;
+
+            if (conns.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">No active connections.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = conns.map(c => {
+                const pid      = c.pid;
+                const app      = c.application_name || '—';
+                const user     = c.username         || '—';
+                const db       = c.database         || '—';
+                const state    = c.state            || 'unknown';
+                const dur      = c.state_seconds != null ? `${c.state_seconds}s` : '—';
+                const query    = c.query_snippet    ? c.query_snippet.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '<span style="color:var(--text-secondary);font-style:italic;">idle</span>';
+
+                const stateColor = state === 'active'           ? '#22c55e'
+                                 : state === 'idle'             ? 'var(--text-secondary)'
+                                 : state === 'idle in transaction' ? '#f97316'
+                                 : '#eab308';
+                const stateBadge = `<span style="background:${stateColor}22;color:${stateColor};padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">${state}</span>`;
+
+                const terminateBtn = c.is_self
+                    ? `<span style="font-size:0.75rem;color:var(--text-secondary);font-style:italic;">this session</span>`
+                    : `<button class="btn-primary db-conn-terminate" data-pid="${pid}" style="padding:0.25rem 0.65rem;font-size:0.78rem;background:var(--error-color);">Terminate</button>`;
+
+                return `
+                    <tr>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);font-family:monospace;color:var(--text-secondary);">${pid}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${app}">${app}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">${user}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">${db}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);">${stateBadge}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);white-space:nowrap;">${dur}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-primary);font-family:monospace;font-size:0.78rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.query_snippet || ''}">${query}</td>
+                        <td style="padding:0.55rem 0.75rem;border-bottom:1px solid var(--border-color);text-align:right;">${terminateBtn}</td>
+                    </tr>`;
+            }).join('');
+        } catch (err) {
+            console.error('Error fetching DB connections:', err);
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--error-color);">Error loading connections.</td></tr>';
         }
     };
 
@@ -190,6 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchMetrics();
     fetchDockerMetrics();
     fetchDbMetrics();
+    fetchDbConnections();
     fetchSecurityMetrics();
     fetchSpammingIps();
 
@@ -200,26 +255,71 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchDbMetrics();
     }, 5000);
 
-    // Poll security every 15 seconds
+    // Poll security + DB connections every 15 seconds
     setInterval(() => {
         fetchSecurityMetrics();
         fetchSpammingIps();
+        fetchDbConnections();
     }, 15000);
 
-    // Event delegation for spam-IPs Block / Unblock buttons (CSP-safe — no onclick=)
+    // Event delegation — DB connection Terminate buttons (CSP-safe, no onclick=)
     document.addEventListener('click', async (e) => {
-        const btn = e.target.closest('.dash-spam-action');
-        if (!btn) return;
 
-        const action = btn.dataset.action;
-        const ip     = btn.dataset.ip;
+        // ── Terminate DB connection ──────────────────────────────────────────
+        const terminateBtn = e.target.closest('.db-conn-terminate');
+        if (terminateBtn) {
+            const pid = terminateBtn.dataset.pid;
+            if (!pid || !confirm(`Terminate DB connection PID ${pid}?`)) return;
+
+            terminateBtn.disabled    = true;
+            terminateBtn.textContent = 'Terminating...';
+
+            const statusEl = document.getElementById('db-conn-status');
+            try {
+                const res  = await fetch(`/dashboard/api/db/connections/${pid}/terminate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (statusEl) {
+                        statusEl.style.display = 'inline';
+                        statusEl.textContent   = `✅ PID ${pid} terminated`;
+                        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                    }
+                    fetchDbConnections();
+                    fetchDbMetrics();
+                } else {
+                    alert('Error: ' + data.error);
+                    terminateBtn.disabled    = false;
+                    terminateBtn.textContent = 'Terminate';
+                }
+            } catch (err) {
+                alert('Network error: ' + err.message);
+                terminateBtn.disabled    = false;
+                terminateBtn.textContent = 'Terminate';
+            }
+            return;
+        }
+
+        // ── Refresh DB connections button ────────────────────────────────────
+        if (e.target.closest('#btn-refresh-conns')) {
+            fetchDbConnections();
+            return;
+        }
+
+        // ── Spam IPs Block / Unblock ─────────────────────────────────────────
+        const spamBtn = e.target.closest('.dash-spam-action');
+        if (!spamBtn) return;
+
+        const action = spamBtn.dataset.action;
+        const ip     = spamBtn.dataset.ip;
         if (!ip) return;
 
-        btn.disabled    = true;
-        btn.textContent = action === 'block' ? 'Blocking...' : 'Unblocking...';
+        spamBtn.disabled    = true;
+        spamBtn.textContent = action === 'block' ? 'Blocking...' : 'Unblocking...';
 
         const statusEl = document.getElementById('spam-block-status');
-
         try {
             const endpoint = action === 'block' ? '/api/security/ban-now' : '/api/security/unblock';
             const res  = await fetch(endpoint, {
@@ -234,16 +334,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusEl.textContent   = `✅ ${ip} ${action === 'block' ? 'blocked' : 'unblocked'}!`;
                     setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
                 }
-                fetchSpammingIps(); // refresh table
+                fetchSpammingIps();
             } else {
                 alert('Error: ' + data.error);
-                btn.disabled    = false;
-                btn.textContent = action === 'block' ? 'Block' : 'Unblock';
+                spamBtn.disabled    = false;
+                spamBtn.textContent = action === 'block' ? 'Block' : 'Unblock';
             }
         } catch (err) {
             alert('Network error: ' + err.message);
-            btn.disabled    = false;
-            btn.textContent = action === 'block' ? 'Block' : 'Unblock';
+            spamBtn.disabled    = false;
+            spamBtn.textContent = action === 'block' ? 'Block' : 'Unblock';
         }
     });
 

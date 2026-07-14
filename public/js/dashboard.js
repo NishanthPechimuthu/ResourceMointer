@@ -117,26 +117,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.error) {
                 const errDiv = document.getElementById('sec-error-container');
-                if (errDiv) {
-                    errDiv.style.display = 'block';
-                    errDiv.textContent = data.error;
-                }
+                if (errDiv) { errDiv.style.display = 'block'; errDiv.textContent = data.error; }
             }
-            
+
             const stats = data.stats;
             setText('sec-failed', stats.failed_requests);
             setText('sec-probes', stats.env_probes + stats.git_probes + stats.wp_probes + stats.pma_probes);
-
-            const ul = document.getElementById('sec-top-ips');
-            if (ul) {
-                if (stats.top_ips.length === 0) {
-                    ul.innerHTML = '<li>No attacker IPs found</li>';
-                } else {
-                    ul.innerHTML = stats.top_ips.map(ip => `<li>${ip.ip} <span style="color:var(--error-color)">(${ip.count} hits)</span></li>`).join('');
-                }
-            }
         } catch (error) {
             console.error('Error fetching security metrics:', error);
+        }
+    };
+
+    const fetchSpammingIps = async () => {
+        const tbody = document.getElementById('spam-ips-body');
+        if (!tbody) return;
+        try {
+            const res  = await fetch('/api/security/attackers');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            const attackers = data.data.slice(0, 10); // show top 10
+
+            if (attackers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">No attackers detected.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = attackers.map(a => {
+                const score    = a.total_score;
+                const scoreClr = score >= 100 ? 'var(--error-color)' : score >= 40 ? '#f97316' : 'var(--warning-color)';
+                const diff     = Date.now() - new Date(a.last_seen).getTime();
+                const min      = Math.floor(diff / 60000);
+                const lastSeen = min < 60 ? `${min}m ago` : `${Math.floor(min/60)}h ago`;
+                const statusBadge = a.is_banned
+                    ? `<span style="background:var(--error-color);color:#fff;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.72rem;font-weight:700;">BANNED</span>`
+                    : score >= 40
+                    ? `<span style="background:#f97316;color:#fff;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.72rem;font-weight:700;">⚠ HIGH</span>`
+                    : `<span style="background:rgba(34,197,94,0.2);color:#22c55e;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.72rem;font-weight:700;">ACTIVE</span>`;
+                const ip = String(a.ip).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                const actionBtn = a.is_banned
+                    ? `<button class="btn-primary dash-spam-action" data-action="unblock" data-ip="${ip}" style="padding:0.25rem 0.6rem;font-size:0.78rem;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border-color);">Unblock</button>`
+                    : `<button class="btn-primary dash-spam-action" data-action="block" data-ip="${ip}" style="padding:0.25rem 0.6rem;font-size:0.78rem;background:var(--error-color);">Block</button>`;
+                return `
+                    <tr>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);font-family:monospace;color:var(--text-primary);">${ip}</td>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);font-weight:700;color:${scoreClr};">${score}</td>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">${a.offense_count}</td>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">${lastSeen}</td>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);">${statusBadge}</td>
+                        <td style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border-color);text-align:right;">${actionBtn}</td>
+                    </tr>`;
+            }).join('');
+        } catch (err) {
+            console.error('Error fetching attackers:', err);
+            if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--error-color);">Error loading data.</td></tr>';
         }
     };
 
@@ -157,17 +191,60 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchDockerMetrics();
     fetchDbMetrics();
     fetchSecurityMetrics();
-    
-    // Poll every 5 seconds
+    fetchSpammingIps();
+
+    // Poll every 5 seconds for system metrics
     setInterval(() => {
         fetchMetrics();
         fetchDockerMetrics();
         fetchDbMetrics();
-        // Don't poll security as frequently to save file reads, or maybe every 15s.
-        // For now, let's just do it every 10 seconds.
     }, 5000);
 
+    // Poll security every 15 seconds
     setInterval(() => {
         fetchSecurityMetrics();
-    }, 10000);
-});
+        fetchSpammingIps();
+    }, 15000);
+
+    // Event delegation for spam-IPs Block / Unblock buttons (CSP-safe — no onclick=)
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.dash-spam-action');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const ip     = btn.dataset.ip;
+        if (!ip) return;
+
+        btn.disabled    = true;
+        btn.textContent = action === 'block' ? 'Blocking...' : 'Unblocking...';
+
+        const statusEl = document.getElementById('spam-block-status');
+
+        try {
+            const endpoint = action === 'block' ? '/api/security/ban-now' : '/api/security/unblock';
+            const res  = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip, reason: 'Quick-block from Dashboard home' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (statusEl) {
+                    statusEl.style.display = 'inline';
+                    statusEl.textContent   = `✅ ${ip} ${action === 'block' ? 'blocked' : 'unblocked'}!`;
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                }
+                fetchSpammingIps(); // refresh table
+            } else {
+                alert('Error: ' + data.error);
+                btn.disabled    = false;
+                btn.textContent = action === 'block' ? 'Block' : 'Unblock';
+            }
+        } catch (err) {
+            alert('Network error: ' + err.message);
+            btn.disabled    = false;
+            btn.textContent = action === 'block' ? 'Block' : 'Unblock';
+        }
+    });
+
+}); // end DOMContentLoaded

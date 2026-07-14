@@ -57,7 +57,7 @@ router.post('/block', async (req, res) => {
         // Also insert into bans table so it shows in the Active System Bans UI list
         await pool.query(
             `INSERT INTO bans (ip, reason, ban_type, expires_at)
-             SELECT $1, $2, 'permanent', NULL
+             SELECT $1::varchar, $2::text, 'permanent'::varchar, NULL::timestamp with time zone
              WHERE NOT EXISTS (
                  SELECT 1 FROM bans WHERE ip = $1 AND (expires_at IS NULL OR expires_at > NOW())
              )`,

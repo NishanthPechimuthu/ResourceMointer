@@ -207,8 +207,8 @@ class SecurityEngine {
                     console.error(`[SecurityEngine] Error reloading Nginx: ${error.message}`);
                     return;
                 }
-                if (stderr) {
-                    console.error(`[SecurityEngine] Nginx reload stderr: ${stderr}`);
+                if (stderr && (stderr.includes('[error]') || stderr.includes('[emerg]') || stderr.includes('[crit]'))) {
+                    console.error(`[SecurityEngine] Nginx reload error: ${stderr}`);
                     return;
                 }
                 console.log(`[SecurityEngine] Nginx reloaded successfully`);

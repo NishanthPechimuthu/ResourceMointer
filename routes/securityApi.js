@@ -22,10 +22,19 @@ router.get('/attackers', async (req, res) => {
     }
 });
 
-// GET /api/security/bans
+// GET /api/security/bans - Returns both auto-bans and manual blacklist entries
 router.get('/bans', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM bans ORDER BY created_at DESC LIMIT 100');
+        // Merge bans table (auto-bans) with blacklist table (manual blocks) into unified view
+        const result = await pool.query(`
+            SELECT id, ip, reason, ban_type, expires_at, created_at FROM bans
+            UNION ALL
+            SELECT NULL as id, ip, reason, 'permanent' as ban_type, NULL as expires_at, created_at
+            FROM blacklist
+            WHERE ip NOT IN (SELECT ip FROM bans)
+            ORDER BY created_at DESC
+            LIMIT 100
+        `);
         res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -37,12 +46,24 @@ router.post('/block', async (req, res) => {
     const { ip, reason } = req.body;
     if (!ip) return res.status(400).json({ success: false, error: 'IP is required' });
 
+    const blockReason = reason || 'Manual block via Dashboard';
+
     try {
+        // Insert into blacklist (for nginx sync)
         await pool.query(
             'INSERT INTO blacklist (ip, reason) VALUES ($1, $2) ON CONFLICT (ip) DO UPDATE SET reason = EXCLUDED.reason',
-            [ip, reason || 'Manual block']
+            [ip, blockReason]
         );
-        // Resync
+        // Also insert into bans table so it shows in the Active System Bans UI list
+        await pool.query(
+            `INSERT INTO bans (ip, reason, ban_type, expires_at)
+             SELECT $1, $2, 'permanent', NULL
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM bans WHERE ip = $1 AND (expires_at IS NULL OR expires_at > NOW())
+             )`,
+            [ip, blockReason]
+        );
+        // Resync nginx bans file
         await securityEngine.syncBansFile();
         res.json({ success: true, message: `IP ${ip} blocked successfully` });
     } catch (err) {
